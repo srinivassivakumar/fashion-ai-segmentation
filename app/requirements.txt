@@ -1,0 +1,15 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart
+numpy
+pillow
+opencv-python-headless
+transformers==4.46.3
+tokenizers==0.20.3
+huggingface-hub
+einops
+matplotlib
+scipy
+scikit-image
+# segment-anything via Git (official repo)
+git+https://github.com/facebookresearch/segment-anything.git
