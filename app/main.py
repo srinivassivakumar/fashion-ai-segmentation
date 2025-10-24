@@ -70,7 +70,7 @@ async def startup_event():
     print("=" * 80)
     
     # Ensure SAM model is available (download if missing)
-    sam_checkpoint = os.getenv("SAM_CHECKPOINT", "/models/sam_vit_b_01ec64.pth")
+    sam_checkpoint = os.getenv("SAM_CHECKPOINT", "data/models/sam_vit_b_01ec64.pth")
     if not os.path.exists(sam_checkpoint):
         print(f"\nSAM model not found at {sam_checkpoint}")
         print("Downloading SAM ViT-B model (375MB)... This may take 1-2 minutes...")
@@ -887,6 +887,57 @@ async def serve_output_file(file_path: str):
         raise HTTPException(status_code=404, detail="File not found")
     
     return FileResponse(full_path)
+
+# ========================================================================================================
+# ENDPOINT: LIST OUTPUT FILES FOR AN IMAGE
+# ========================================================================================================
+
+@app.get("/list-outputs/{image_name}")
+async def list_outputs(image_name: str):
+    """List all output files for a processed image"""
+    output_dir = Config.OUTPUT_BASE
+    
+    files = {
+        "crops": [],
+        "masks_raw": [],
+        "masks_refined": [],
+        "visualization": None,
+        "original": None
+    }
+    
+    # Check for crops
+    crops_dir = os.path.join(output_dir, "crops_centered")
+    if os.path.exists(crops_dir):
+        for file in os.listdir(crops_dir):
+            if file.startswith(image_name) and file.endswith('.png'):
+                files["crops"].append(f"crops_centered/{file}")
+    
+    # Check for masks
+    masks_raw_dir = os.path.join(output_dir, "masks_raw")
+    if os.path.exists(masks_raw_dir):
+        for file in os.listdir(masks_raw_dir):
+            if file.startswith(image_name) and file.endswith('.png'):
+                files["masks_raw"].append(f"masks_raw/{file}")
+    
+    masks_refined_dir = os.path.join(output_dir, "masks_refined")
+    if os.path.exists(masks_refined_dir):
+        for file in os.listdir(masks_refined_dir):
+            if file.startswith(image_name) and file.endswith('.png'):
+                files["masks_refined"].append(f"masks_refined/{file}")
+    
+    # Check for visualization and original
+    for file in os.listdir(output_dir):
+        if file.startswith(image_name):
+            if file.endswith('_visualization.png'):
+                files["visualization"] = file
+            elif file.endswith('_original.jpg'):
+                files["original"] = file
+    
+    return JSONResponse({
+        "image_name": image_name,
+        "files": files,
+        "total_files": sum(len(v) if isinstance(v, list) else (1 if v else 0) for v in files.values())
+    })
 
 # ========================================================================================================
 # MAIN: RUN SERVER
