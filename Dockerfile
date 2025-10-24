@@ -4,6 +4,8 @@ FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 # Set the working directory
 WORKDIR /workspace
 
+# Force cache invalidation
+
 # Copy the app directory contents
 COPY app/ /workspace/
 
