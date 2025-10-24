@@ -4,12 +4,19 @@ FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 # Set working directory
 WORKDIR /app
 
+# Set timezone to avoid interactive prompt
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Kolkata
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     libgl1 \
     libglib2.0-0 \
     wget \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first (better caching)
