@@ -71,17 +71,114 @@ The server will start at `http://localhost:8080`
 
 ## API Endpoints
 
-### Web Interface
+### Public Endpoints (No Authentication Required)
 - `GET /` - Web GUI for image upload and visualization
+- `GET /results/{image_name}` - View processing results for a specific image
+- `GET /outputs/{path}` - Serve output files (segmentation masks, crops, etc.)
 
-### API Endpoints
+### Protected Endpoints (API Key Required)
 - `POST /upload` - Upload and process an image
   - Input: Image file (JPEG/PNG)
+  - Headers: `X-API-Key: your_api_key_here`
   - Output: JSON with paths to processed results
   
-- `GET /results/{image_name}` - View processing results for a specific image
-  
-- `GET /outputs/{path}` - Serve output files (segmentation masks, crops, etc.)
+- `GET /list-outputs/{image_name}` - List all output files for a processed image
+  - Headers: `X-API-Key: your_api_key_here`
+  - Output: JSON with file paths organized by type
+
+## API Key Authentication
+
+This API uses API key authentication to protect the upload and list endpoints while keeping the web interface publicly accessible.
+
+### Setting Up API Key
+
+#### For Local Development
+Set the environment variable before running:
+
+```bash
+# Linux/Mac
+export FASHION_AI_API_KEY="your-secure-api-key-here"
+python app/main.py
+
+# Windows PowerShell
+$env:FASHION_AI_API_KEY="your-secure-api-key-here"
+python app/main.py
+```
+
+If no API key is set, the server will generate and display a temporary one on startup.
+
+#### For Docker
+Pass the API key as an environment variable:
+
+```bash
+docker run -p 8080:8080 -e FASHION_AI_API_KEY="your-secure-api-key-here" srinivassivakumar123/fashion-ai-segmentation
+```
+
+#### For Railway (Production)
+1. Go to your Railway project dashboard
+2. Click on your service
+3. Go to "Variables" tab
+4. Add a new variable:
+   - Key: `FASHION_AI_API_KEY`
+   - Value: Your secure API key (generate using: `python -c "import secrets; print(secrets.token_urlsafe(32))"`)
+
+### Using the API with Authentication
+
+#### cURL Examples
+
+**Upload an image:**
+```bash
+curl -X POST http://localhost:8000/upload \
+  -H "X-API-Key: your_api_key_here" \
+  -F "file=@/path/to/image.jpg"
+```
+
+**List outputs:**
+```bash
+curl -H "X-API-Key: your_api_key_here" \
+  http://localhost:8000/list-outputs/image_name
+```
+
+**Download all crops:**
+```bash
+curl -s -H "X-API-Key: your_api_key_here" \
+  http://localhost:8000/list-outputs/temp_m_2 | \
+  jq -r '.files.crops[]' | \
+  while read filename; do 
+    echo "Downloading: $filename"
+    curl -O "http://localhost:8000/outputs/$filename"
+  done
+```
+
+#### Python Example
+
+```python
+import requests
+
+API_KEY = "your_api_key_here"
+BASE_URL = "https://fashion-ai-segmentation-production.up.railway.app"
+
+# Upload and process image
+headers = {"X-API-Key": API_KEY}
+files = {"file": open("image.jpg", "rb")}
+response = requests.post(f"{BASE_URL}/upload", headers=headers, files=files)
+result = response.json()
+
+print(f"Processed: {result['image_name']}")
+print(f"Components: {result['num_components']}")
+print(f"Categories: {result['categories']}")
+
+# List all output files
+image_name = result["image_name"]
+outputs = requests.get(f"{BASE_URL}/list-outputs/{image_name}", headers=headers)
+print(outputs.json())
+
+# Download a specific crop
+crop_url = f"{BASE_URL}/outputs/crops_centered/{image_name}_upper_clothes_1.png"
+crop_response = requests.get(crop_url)
+with open("crop.png", "wb") as f:
+    f.write(crop_response.content)
+```
 
 ## Output Structure
 

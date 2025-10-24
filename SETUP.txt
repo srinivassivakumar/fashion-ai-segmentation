@@ -3,7 +3,7 @@ FASHION AI SEGMENTATION - COMPLETE SETUP GUIDE
 ================================================================================
 
 This guide will help you set up and run the Fashion AI Segmentation system
-after cloning the repository.
+with API key authentication after cloning the repository.
 
 ================================================================================
 📁 PROJECT STRUCTURE
@@ -14,53 +14,107 @@ After cloning the repository, you will have the following structure:
 fashion-ai-segmentation/
 │
 ├── app/                              # Main application directory
-│   ├── main.py                       # FastAPI server with web GUI
-│   │                                 # - Handles image uploads
-│   │                                 # - Processes images through pipeline
-│   │                                 # - Serves web interface and API
-│   │
+│   ├── main.py                       # FastAPI server with web GUI and API auth
 │   ├── requirements.txt              # Python dependencies
-│   │                                 # - FastAPI, Uvicorn
-│   │                                 # - PyTorch, Transformers
-│   │                                 # - OpenCV, NumPy, Pillow
-│   │                                 # - Segment Anything (SAM)
-│   │
 │   ├── src/                          # Source code modules
-│   │   ├── segformer_sam_auto_center.py
-│   │   │                             # Main pipeline orchestrator
-│   │   │                             # - Loads SegFormer model
-│   │   │                             # - Loads SAM predictor
-│   │   │                             # - Processes images end-to-end
-│   │   │
-│   │   ├── segformer_sam_extractor.py
-│   │   │                             # Segmentation extraction logic
-│   │   │                             # - SegFormer inference
-│   │   │                             # - SAM mask refinement
-│   │   │                             # - Mask post-processing
-│   │   │
-│   │   └── postprocess_center_crops.py
-│   │                                 # Auto-centering algorithm
-│   │                                 # - Centers detected garments
-│   │                                 # - Crops individual items
-│   │                                 # - Saves cropped images
-│   │
-│   ├── data/                         # Model weights directory
-│   │   └── models/                   # ⚠️ YOU NEED TO CREATE THIS
-│   │       └── sam_vit_b_01ec64.pth  # SAM model (download required)
-│   │
-│   ├── outputs/                      # Processing results (auto-created)
-│   │   ├── {image_name}_original.jpg
-│   │   ├── {image_name}_visualization.png
-│   │   ├── masks_raw/                # Raw SegFormer masks
-│   │   ├── masks_refined/            # SAM-refined masks
-│   │   └── crops_centered/           # Individual garment crops
-│   │
-│   └── temp_uploads/                 # Temporary upload storage
+│   │   ├── segformer_sam_auto_center.py    # Main pipeline orchestrator
+│   │   ├── segformer_sam_extractor.py      # Segmentation extraction logic
+│   │   └── postprocess_center_crops.py     # Auto-centering algorithm
+│   ├── data/models/                  # Model weights directory
+│   └── outputs/                      # Processing results (auto-created)
 │
 ├── Dockerfile                        # Docker configuration
-├── .gitignore                        # Git ignore rules
 ├── README.md                         # Project documentation
 └── SETUP.txt                         # This file
+
+================================================================================
+🔐 API KEY AUTHENTICATION (NEW!)
+================================================================================
+
+The API now includes API key authentication to protect upload and list endpoints
+while keeping the web interface publicly accessible.
+
+────────────────────────────────────────────────────────────────────────────────
+1. GENERATING A SECURE API KEY
+────────────────────────────────────────────────────────────────────────────────
+
+Generate a secure random API key using Python:
+
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+Example output: xK9mP2nQ7wR5tY8uI1oL3aS6dF4gH0jK9mN2bV5cX8zA1sD4fG7hJ0
+
+⚠️ IMPORTANT: Save this key securely - you'll need it to access the API.
+
+────────────────────────────────────────────────────────────────────────────────
+2. RAILWAY DEPLOYMENT SETUP (PRODUCTION)
+────────────────────────────────────────────────────────────────────────────────
+
+To deploy on Railway with API key authentication:
+
+1. Go to your Railway dashboard: https://railway.app/dashboard
+2. Select your project: fashion-ai-segmentation-production
+3. Click on your service
+4. Go to the "Variables" tab
+5. Add a new environment variable:
+   
+   Variable Name:  FASHION_AI_API_KEY
+   Variable Value: <your-generated-api-key>
+
+6. Save the variable
+7. Railway will automatically redeploy your service with the new configuration
+
+────────────────────────────────────────────────────────────────────────────────
+3. API ENDPOINTS
+────────────────────────────────────────────────────────────────────────────────
+
+PUBLIC ENDPOINTS (No authentication required):
+    - GET  /                          - Web interface
+    - GET  /results/{image_name}      - View results page
+    - GET  /outputs/{path}            - Download output files
+
+PROTECTED ENDPOINTS (Require X-API-Key header):
+    - POST /upload                    - Upload and process image
+    - GET  /list-outputs/{image_name} - List all output files
+
+────────────────────────────────────────────────────────────────────────────────
+4. USING THE API WITH AUTHENTICATION
+────────────────────────────────────────────────────────────────────────────────
+
+cURL Examples:
+
+Upload an image:
+    curl -X POST https://fashion-ai-segmentation-production.up.railway.app/upload \
+      -H "X-API-Key: your-api-key-here" \
+      -F "file=@image.jpg"
+
+List outputs:
+    curl -H "X-API-Key: your-api-key-here" \
+      https://fashion-ai-segmentation-production.up.railway.app/list-outputs/temp_m_2
+
+Download all crops:
+    curl -s -H "X-API-Key: your-api-key-here" \
+      http://localhost:8000/list-outputs/temp_m_2 | \
+      jq -r '.files.crops[]' | \
+      while read filename; do 
+        echo "Downloading: $filename"
+        curl -O "http://localhost:8000/outputs/$filename"
+      done
+
+Python Example:
+    import requests
+
+    API_KEY = "your-api-key-here"
+    BASE_URL = "https://fashion-ai-segmentation-production.up.railway.app"
+
+    # Upload and process image
+    headers = {"X-API-Key": API_KEY}
+    files = {"file": open("image.jpg", "rb")}
+    response = requests.post(f"{BASE_URL}/upload", headers=headers, files=files)
+    result = response.json()
+
+    print(f"Processed: {result['image_name']}")
+    print(f"Components: {result['num_components']}")
 
 ================================================================================
 🔧 PREREQUISITES
@@ -75,43 +129,34 @@ fashion-ai-segmentation/
 3. Git
    - Check: git --version
 
-4. (Optional) CUDA-capable GPU
-   - For faster processing
-   - CPU mode works but is slower
+4. (Optional) CUDA-capable GPU for faster processing
 
-5. (Optional) Docker
-   - For containerized deployment
-   - Check: docker --version
+5. (Optional) Docker for containerized deployment
 
 ================================================================================
 📥 INSTALLATION METHODS
 ================================================================================
 
-Choose ONE of the following methods:
-
 ────────────────────────────────────────────────────────────────────────────────
-METHOD 1: DOCKER (EASIEST - RECOMMENDED FOR BEGINNERS)
+METHOD 1: DOCKER (EASIEST - RECOMMENDED)
 ────────────────────────────────────────────────────────────────────────────────
-
-This method uses the pre-built Docker image from Docker Hub.
-No setup required - everything is included!
 
 Step 1: Pull the Docker image
    docker pull srinivassivakumar123/fashion-ai-segmentation
 
-Step 2: Run the container
-   docker run -p 8080:8080 srinivassivakumar123/fashion-ai-segmentation
+Step 2: Run the container with API key
+   docker run -p 8080:8080 \
+     -e FASHION_AI_API_KEY="your-api-key-here" \
+     srinivassivakumar123/fashion-ai-segmentation
 
 Step 3: Open your browser
    Navigate to: http://localhost:8080
 
-✅ DONE! The application is ready to use.
+✅ DONE! The web interface is publicly accessible, but API calls need your key.
 
 ────────────────────────────────────────────────────────────────────────────────
 METHOD 2: MANUAL SETUP FROM GITHUB (FOR DEVELOPERS)
 ────────────────────────────────────────────────────────────────────────────────
-
-This method sets up the application from source code.
 
 Step 1: Clone the repository
    git clone https://github.com/srinivassivakumar/fashion-ai-segmentation.git
@@ -131,164 +176,88 @@ Step 3: Create a virtual environment (recommended)
 
 Step 4: Install dependencies
    pip install -r requirements.txt
-   
-   Note: This will take 5-10 minutes as it downloads:
-   - PyTorch (large package)
-   - Transformers and HuggingFace models
-   - Segment Anything (SAM) from GitHub
-   - OpenCV and other image processing libraries
 
 Step 5: Create model directory
-   # On Windows:
-   mkdir data\models
-   
-   # On macOS/Linux:
    mkdir -p data/models
 
-Step 6: Download SAM model weights
-   Option A - Using wget (Linux/macOS/Git Bash on Windows):
-   wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -O data/models/sam_vit_b_01ec64.pth
-   
-   Option B - Using curl:
-   curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -o data/models/sam_vit_b_01ec64.pth
-   
-   Option C - Manual download:
-   1. Go to: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
-   2. Save file to: app/data/models/sam_vit_b_01ec64.pth
-   
-   ⚠️ File size: ~375 MB - download may take several minutes
+Step 6: Download SAM model weights (375 MB)
+   wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth \
+     -O data/models/sam_vit_b_01ec64.pth
 
-Step 7: Run the application
+Step 7: Set API key and run
+   # Windows PowerShell:
+   $env:FASHION_AI_API_KEY="your-api-key-here"
    python main.py
    
-   You should see:
-   [INFO] Loading SegFormer model...
-   [INFO] Loading SAM predictor...
-   [INFO] Starting FastAPI server...
-   INFO:     Uvicorn running on http://0.0.0.0:8080
+   # Linux/Mac:
+   export FASHION_AI_API_KEY="your-api-key-here"
+   python main.py
+
+   Note: If no API key is set, a temporary one will be generated and displayed.
 
 Step 8: Open your browser
-   Navigate to: http://localhost:8080
+   Navigate to: http://localhost:8000
 
 ✅ DONE! The application is ready to use.
 
 ────────────────────────────────────────────────────────────────────────────────
-METHOD 3: BUILD DOCKER IMAGE LOCALLY (FOR CUSTOMIZATION)
+METHOD 3: BUILD DOCKER IMAGE LOCALLY
 ────────────────────────────────────────────────────────────────────────────────
 
-This method builds a Docker image from the source code.
-
-Step 1: Clone the repository
+Step 1: Clone and build
    git clone https://github.com/srinivassivakumar/fashion-ai-segmentation.git
    cd fashion-ai-segmentation
-
-Step 2: Build Docker image
    docker build -t fashion-ai-segmentation .
-   
-   Note: This will take 10-20 minutes on first build
 
-Step 3: Run the container
-   docker run -p 8080:8080 fashion-ai-segmentation
+Step 2: Run with API key
+   docker run -p 8080:8080 \
+     -e FASHION_AI_API_KEY="your-api-key-here" \
+     fashion-ai-segmentation
 
-Step 4: Open your browser
+Step 3: Open your browser
    Navigate to: http://localhost:8080
 
-✅ DONE! The application is ready to use.
+✅ DONE!
 
 ================================================================================
 🚀 USING THE APPLICATION
 ================================================================================
 
-Once the server is running, you can use it in two ways:
+The application has two interfaces:
 
-────────────────────────────────────────────────────────────────────────────────
-WEB INTERFACE (GUI)
-────────────────────────────────────────────────────────────────────────────────
+1. WEB INTERFACE (No API key needed)
+   - Visit http://localhost:8080 in your browser
+   - Upload images via drag-and-drop or file picker
+   - View results and download crops
 
-1. Open browser: http://localhost:8080
-
-2. You'll see a web interface with an upload button
-
-3. Click "Choose File" or drag-and-drop an image
-   - Supported formats: JPEG, PNG
-   - Recommended size: < 2000x2000 pixels for faster processing
-
-4. Click "Upload and Process"
-
-5. Wait for processing (2-20 seconds depending on image size and hardware)
-
-6. View results:
-   - Original image
-   - Segmentation visualization
-   - Individual garment crops (automatically centered)
-
-────────────────────────────────────────────────────────────────────────────────
-API INTERFACE (PROGRAMMATIC)
-────────────────────────────────────────────────────────────────────────────────
-
-POST /upload - Upload and process an image
-
-Example using curl:
-   curl -X POST -F "file=@/path/to/image.jpg" http://localhost:8080/upload
-
-Example using Python:
-   import requests
-   
-   url = "http://localhost:8080/upload"
-   files = {"file": open("image.jpg", "rb")}
-   response = requests.post(url, files=files)
-   print(response.json())
-
-GET /results/{image_name} - View processing results
-
-Example:
-   http://localhost:8080/results/my_outfit.jpg
-
-GET /outputs/{path} - Download specific output file
-
-Example:
-   http://localhost:8080/outputs/crops_centered/my_outfit_upper_clothes_2.png
+2. API INTERFACE (Requires API key)
+   - POST /upload - Upload images programmatically
+   - GET /list-outputs/{image_name} - List all generated files
+   - See examples above for cURL and Python usage
 
 ================================================================================
 📊 OUTPUT FILES EXPLAINED
 ================================================================================
 
-After processing an image named "outfit.jpg", you'll get:
+After processing "outfit.jpg", you'll get:
 
-1. outputs/outfit_original.jpg
-   - The original uploaded image (preserved)
-
-2. outputs/outfit_visualization.png
-   - Segmentation overlay showing detected garments in different colors
-
-3. outputs/masks_raw/outfit_segformer_raw.png
-   - Raw segmentation mask from SegFormer model
-   - Each pixel value represents a garment class (0-12)
-
-4. outputs/masks_refined/outfit_sam_refined.png
-   - Refined mask after SAM processing
-   - More precise boundaries around garments
-
-5. outputs/crops_centered/outfit_hat_1.png
-   - Cropped and centered hat (if detected)
-
-6. outputs/crops_centered/outfit_upper_clothes_2.png
-   - Cropped and centered shirt/top (if detected)
-
-7. outputs/crops_centered/outfit_pants_4.png
-   - Cropped and centered pants (if detected)
-
-... and so on for each detected garment class
+1. outfit_original.jpg - Original uploaded image
+2. outfit_visualization.png - Segmentation overlay
+3. masks_raw/outfit_segformer_raw.png - Raw SegFormer mask
+4. masks_refined/outfit_sam_refined.png - SAM-refined mask
+5. crops_centered/outfit_hat_1.png - Centered hat crop
+6. crops_centered/outfit_upper_clothes_2.png - Centered top
+7. crops_centered/outfit_pants_4.png - Centered pants
+... and so on for each detected garment
 
 ================================================================================
 👕 DETECTED GARMENT CLASSES
 ================================================================================
 
-The system can detect and segment 13 fashion categories:
+The system can detect 13 fashion categories:
 
-Class 0:  Background (ignored)
 Class 1:  Hat
-Class 2:  Upper Clothes (shirts, t-shirts, jackets, hoodies, etc.)
+Class 2:  Upper Clothes (shirts, t-shirts, jackets, etc.)
 Class 3:  Skirt
 Class 4:  Pants (jeans, trousers, shorts, etc.)
 Class 5:  Dress
@@ -296,125 +265,68 @@ Class 6:  Belt
 Class 7:  Left Shoe
 Class 8:  Right Shoe
 Class 9:  Face (detected but not cropped)
-Class 10: Left Leg (detected but not cropped)
-Class 11: Right Leg (detected but not cropped)
-Class 12: Left Arm (detected but not cropped)
-Class 13: Right Arm (detected but not cropped)
+Class 10: Left Leg
+Class 11: Right Leg
+Class 12: Left Arm
+Class 13: Right Arm
 
-Note: Only wearable items (classes 1-8) are cropped and saved individually.
-Body parts are used for context but not extracted.
-
-================================================================================
-⚙️ CONFIGURATION
-================================================================================
-
-You can customize the pipeline by editing:
-
-app/src/segformer_sam_auto_center.py
-
-Key configuration options in the Config class:
-
-- MODEL_NAME: SegFormer model to use
-- SAM_CHECKPOINT: Path to SAM model weights
-- DEVICE: "cuda" (GPU) or "cpu"
-- OUTPUT_DIR: Where to save results
-- CONFIDENCE_THRESHOLD: Minimum confidence for detections
+Note: Only wearable items (classes 1-8) are cropped and saved.
 
 ================================================================================
 ❓ TROUBLESHOOTING
 ================================================================================
 
-Problem: "Module not found" errors
-Solution: Make sure you're in the app/ directory and virtual environment
-          is activated. Re-run: pip install -r requirements.txt
+"Invalid or missing API Key" error:
+    - Ensure you're passing the X-API-Key header
+    - Verify the API key matches the one set in Railway/environment
+    - Check that FASHION_AI_API_KEY environment variable is set
 
-Problem: "SAM model not found"
-Solution: Download the SAM model weights as described in Step 6 of Method 2
-          File should be at: app/data/models/sam_vit_b_01ec64.pth
+Temporary API key displayed on startup:
+    - This means no API key environment variable was found
+    - Set FASHION_AI_API_KEY for a persistent key
 
-Problem: "CUDA out of memory"
-Solution: Your GPU doesn't have enough VRAM. The application will
-          automatically fall back to CPU mode, or you can:
-          - Resize images to smaller dimensions
-          - Close other GPU-intensive applications
+"Module not found" errors:
+    - Activate virtual environment
+    - Re-run: pip install -r requirements.txt
 
-Problem: "Processing is very slow"
-Solution: This is normal on CPU. Expected times:
-          - GPU: 2-5 seconds per image
-          - CPU: 10-30 seconds per image
-          Consider using the Docker image or enabling GPU support.
+"SAM model not found":
+    - Download SAM weights to app/data/models/sam_vit_b_01ec64.pth
 
-Problem: "Port 8080 already in use"
-Solution: Another application is using port 8080. Either:
-          - Stop the other application
-          - Change the port in main.py (look for uvicorn.run)
-          - Run with custom port: uvicorn main:app --port 8081
+"CUDA out of memory":
+    - Application will fall back to CPU mode
+    - Resize images to smaller dimensions
 
-Problem: "Image quality is poor in crops"
-Solution: Upload higher resolution images. The system preserves
-          original quality but small input images will have small crops.
+"Processing is very slow":
+    - GPU: 2-5 seconds per image
+    - CPU: 10-30 seconds per image (normal)
 
-Problem: "No garments detected"
-Solution: Make sure the image contains visible clothing items.
-          Try with a well-lit image showing clear garments.
+"Port 8080 already in use":
+    - Change port: uvicorn main:app --port 8081
+
+"No garments detected":
+    - Ensure image contains visible clothing items
+    - Use well-lit images with clear garments
 
 ================================================================================
 🔒 SECURITY NOTES
 ================================================================================
 
-1. The server runs on 0.0.0.0:8080 (accessible from network)
-   - For production, add authentication
-   - Use HTTPS in production environments
-   - Consider firewall rules
-
-2. Uploaded images are stored temporarily
-   - Files are saved in temp_uploads/
-   - Consider implementing cleanup routines
-
-3. No data is sent to external services
-   - All processing happens locally
-   - Models run on your machine
-   - No cloud API calls required
+- Keep your API key secure and never commit it to version control
+- Rotate your API key regularly
+- Use HTTPS in production (Railway provides this automatically)
+- Monitor API usage through Railway logs
+- Consider implementing rate limiting for heavy production use
+- Web interface remains public for easy demo access
+- API endpoints are protected to prevent abuse
 
 ================================================================================
 📈 PERFORMANCE TIPS
 ================================================================================
 
-1. Use GPU if available
-   - 5-10x faster than CPU
-   - Install CUDA toolkit for GPU support
-
-2. Optimize image sizes
-   - Resize images to 1024x1024 for balance between speed and quality
-   - Very large images (>4000px) can be slow
-
-3. Batch processing
-   - Modify main.py to process multiple images
-   - Reuse loaded models (don't reload for each image)
-
-4. Docker optimization
-   - Use --gpus all flag for GPU support in Docker:
-     docker run --gpus all -p 8080:8080 fashion-ai-segmentation
-
-================================================================================
-🛠️ DEVELOPMENT
-================================================================================
-
-To modify or extend the system:
-
-1. Fork the repository on GitHub
-
-2. Make your changes in the src/ directory
-
-3. Test locally using Method 2 (manual setup)
-
-4. Submit a pull request
-
-Key files to modify:
-- app/main.py: API endpoints and web interface
-- app/src/segformer_sam_auto_center.py: Main pipeline logic
-- app/src/segformer_sam_extractor.py: Segmentation algorithms
-- app/src/postprocess_center_crops.py: Cropping and centering logic
+1. Use GPU if available (5-10x faster than CPU)
+2. Optimize image sizes (1024x1024 is a good balance)
+3. Batch processing - reuse loaded models
+4. Docker with GPU: docker run --gpus all -p 8080:8080 ...
 
 ================================================================================
 📚 ADDITIONAL RESOURCES
@@ -423,28 +335,20 @@ Key files to modify:
 - SegFormer Paper: https://arxiv.org/abs/2105.15203
 - SAM Paper: https://arxiv.org/abs/2304.02643
 - FastAPI Docs: https://fastapi.tiangolo.com/
-- PyTorch Docs: https://pytorch.org/docs/
+- GitHub: https://github.com/srinivassivakumar/fashion-ai-segmentation
 
 ================================================================================
 💬 SUPPORT
 ================================================================================
 
-For issues, questions, or contributions:
-
+For issues or questions:
 GitHub Issues: https://github.com/srinivassivakumar/fashion-ai-segmentation/issues
-Docker Hub: https://hub.docker.com/r/srinivassivakumar123/fashion-ai-segmentation
 
 Please provide:
 - Operating system and version
 - Python version
 - Error messages (full traceback)
 - Steps to reproduce the issue
-
-================================================================================
-📄 LICENSE
-================================================================================
-
-MIT License - See README.md for details
 
 ================================================================================
 

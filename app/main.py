@@ -7,10 +7,15 @@ This API provides a web interface to upload images and process them using the in
 SegFormer + SAM + Auto-Center pipeline.
 
 Endpoints:
-    GET  /                      - Web GUI for image upload
-    POST /upload                - Upload and process image
-    GET  /results/{image_name}  - View processing results
-    GET  /outputs/{path:path}   - Serve output files (images)
+    GET  /                          - Web GUI for image upload (PUBLIC)
+    POST /upload                    - Upload and process image (REQUIRES API KEY)
+    GET  /list-outputs/{image_name} - List all output files (REQUIRES API KEY)
+    GET  /results/{image_name}      - View processing results (PUBLIC)
+    GET  /outputs/{path:path}       - Serve output files (PUBLIC)
+
+Authentication:
+    Protected endpoints require X-API-Key header with valid API key.
+    Set FASHION_AI_API_KEY environment variable to configure the API key.
 
 Author: AI-Assisted Fashion Segmentation System
 Date: 2025
@@ -24,10 +29,13 @@ from pathlib import Path
 from typing import Optional
 import glob
 import urllib.request
+import secrets
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Security, Depends
+from fastapi.security import APIKeyHeader
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.status import HTTP_403_FORBIDDEN
 import uvicorn
 
 # Add src directory to path to import the segformer_sam_auto_center module
@@ -55,6 +63,39 @@ app = FastAPI(
 segformer_model = None
 segformer_processor = None
 sam_predictor = None
+
+# ========================================================================================================
+# API KEY AUTHENTICATION
+# ========================================================================================================
+
+# Load API key from environment variable
+API_KEY = os.getenv("FASHION_AI_API_KEY")
+
+# If no API key is set, generate a random one and print it (for development)
+if not API_KEY:
+    API_KEY = secrets.token_urlsafe(32)
+    print("\n" + "=" * 80)
+    print("⚠️  WARNING: No API_KEY environment variable found!")
+    print("Generated temporary API key for this session:")
+    print(f"API_KEY: {API_KEY}")
+    print("Set FASHION_AI_API_KEY environment variable for production use.")
+    print("=" * 80 + "\n")
+
+# API Key header scheme
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def get_api_key(api_key: str = Security(api_key_header)):
+    """
+    Validate API key from request header.
+    Raises 403 if invalid or missing.
+    """
+    if api_key == API_KEY:
+        return api_key
+    else:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail="Invalid or missing API Key. Please provide a valid X-API-Key header."
+        )
 
 # ========================================================================================================
 # STARTUP EVENT: LOAD MODELS
@@ -489,12 +530,18 @@ async def home():
 # ========================================================================================================
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(
+    file: UploadFile = File(...),
+    api_key: str = Depends(get_api_key)
+):
     """
     Upload and process an image through the SegFormer + SAM pipeline
     
+    Requires valid API key in X-API-Key header.
+    
     Args:
         file: Uploaded image file
+        api_key: API key for authentication
     
     Returns:
         JSON response with processing results and file paths
@@ -893,8 +940,22 @@ async def serve_output_file(file_path: str):
 # ========================================================================================================
 
 @app.get("/list-outputs/{image_name}")
-async def list_outputs(image_name: str):
-    """List all output files for a processed image"""
+async def list_outputs(
+    image_name: str,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    List all output files for a processed image
+    
+    Requires valid API key in X-API-Key header.
+    
+    Args:
+        image_name: Name of the processed image
+        api_key: API key for authentication
+    
+    Returns:
+        JSON with file paths
+    """
     output_dir = Config.OUTPUT_BASE
     
     files = {
