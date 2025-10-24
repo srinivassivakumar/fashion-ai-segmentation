@@ -22,10 +22,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # If not set, a temporary key will be generated and displayed on startup
 ENV FASHION_AI_API_KEY=""
 
-# Make port 8080 available to the world outside this container
-EXPOSE 8080
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
 
 # Run the FastAPI application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 
