@@ -2,10 +2,10 @@
 FROM pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
 
 # Set the working directory
-WORKDIR /app
+WORKDIR /workspace
 
-# Copy the current directory contents into the container
-COPY . /app
+# Copy the app directory contents
+COPY app/ /workspace/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -25,7 +25,6 @@ ENV FASHION_AI_API_KEY=""
 EXPOSE 8080
 
 # Run the FastAPI application
-# The app is located at app/main.py with the FastAPI instance named 'app'
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 
 
