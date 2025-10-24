@@ -1,33 +1,37 @@
-# Use an official PyTorch runtime as a parent image
+# Use PyTorch image as base
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
-# Set the working directory
-WORKDIR /workspace
-
-# Force cache invalidation
-
-# Copy the app directory contents
-COPY app/ /workspace/
+# Set working directory
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy only requirements first (better caching)
+COPY app/requirements.txt requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Environment variable for API key authentication
-# Set this when running the container: docker run -e FASHION_AI_API_KEY="your-key" ...
-# If not set, a temporary key will be generated and displayed on startup
+# Create necessary directories
+RUN mkdir -p data/models outputs temp_uploads
+
+# Download SAM model
+RUN wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -O data/models/sam_vit_b_01ec64.pth
+
+# Copy application code
+COPY app/ .
+
+# Environment variable for API key (set this when running container)
 ENV FASHION_AI_API_KEY=""
 
-# Make port 8000 available to the world outside this container
+# Expose port
 EXPOSE 8000
 
-# Run the FastAPI application
+# Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
